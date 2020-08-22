@@ -1,0 +1,37 @@
+## Calculate customa channel grouping
+
+Refer to: https://towardsdatascience.com/how-to-query-and-calculate-google-analytics-data-in-bigquery-cab8fc4f396
+
+```SQL
+SELECT
+  -- Default Channel Grouping (dimension)
+  CASE
+    WHEN trafficSource.source = '(direct)' AND (trafficSource.medium = '(not set)' OR trafficSource.medium = '(none)') THEN 'Direct'
+    WHEN trafficSource.medium = 'organic' THEN 'Organic Search'
+    WHEN hits.social.hasSocialSourceReferral = 'Yes' OR REGEXP_CONTAINS(trafficSource.medium, r'^(social|social-network|social-media|sm|social network|social media)$') THEN 'Social'
+    WHEN trafficSource.medium = 'email' THEN 'Email'
+    WHEN trafficSource.medium = 'affiliate' THEN 'Affiliates'
+    WHEN trafficSource.medium = 'referral' THEN 'Referral'
+    WHEN REGEXP_CONTAINS(trafficSource.medium, r'^(cpc|ppc|paidsearch)$') AND trafficSource.adwordsClickInfo.adNetworkType != 'Content' THEN 'Paid Search'
+    WHEN REGEXP_CONTAINS(trafficSource.medium, r' ^(cpv|cpa|cpp|content-text)$') THEN 'Other Advertising'
+    WHEN REGEXP_CONTAINS(trafficSource.medium, r'^(display|cpm|banner)$') OR trafficSource.adwordsClickInfo.adNetworkType = 'Content' THEN 'Display'
+  ELSE
+  '(Other)'
+END
+  AS Default_Channel_Grouping,
+  -- Sessions (metric)
+  COUNT(DISTINCT CONCAT(fullVisitorId, CAST(visitStartTime AS STRING))) AS Sessions
+FROM
+  `bigquery-public-data.google_analytics_sample.ga_sessions_*`,
+  UNNEST(hits) AS hits
+WHERE
+  _table_suffix BETWEEN '20160801'
+  AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+  AND totals.visits = 1
+GROUP BY
+  1
+ORDER BY
+  2 DESC
+LIMIT
+  10
+```  
